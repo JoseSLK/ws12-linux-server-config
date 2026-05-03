@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>wei-networks — WS12 Workshop</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="site-header__inner">
+        <h1 class="site-title">wei-networks</h1>
+        <nav class="nav" aria-label="Workshops">
+          <a href="#ws12">WS 12</a>
+          <span class="nav__disabled" title="Not available yet">Linux server</span>
+        </nav>
+      </div>
+    </header>
+
+    <main id="ws12">
+      <header class="hero">
+        <h1>Workshop 12 — Windows Server lab</h1>
+        <p>
+          Step-by-step setup: static addressing, Active Directory, DHCP and DNS,
+          FTP and SMTP, and a simple HTTP site. Follow in order; server restarts
+          after domain promotion are expected.
+        </p>
+      </header>
+
+      <!-- Section 1 -->
+      <section class="section" aria-labelledby="s1">
+        <h2 id="s1">1. Configure a static IP</h2>
+        <p class="lead">
+          Domain controllers need a fixed address so clients and DNS always
+          resolve the same host. Set IPv4 manually before installing roles.
+        </p>
+        <div class="step">
+          <h3>Network adapter</h3>
+          <p>
+            Open adapter settings, choose the interface that faces your lab LAN,
+            and assign IP, subnet mask, and DNS (you can point DNS at this
+            machine after AD DNS is installed).
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777665403/1_epoqwm.png"
+              alt="Windows network adapter IPv4 static configuration"
+              loading="lazy"
+            />
+            <figcaption>Static IPv4 on the server interface.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- Section 2 -->
+      <section class="section" aria-labelledby="s2">
+        <h2 id="s2">2. Active Directory Domain Services (AD DS)</h2>
+        <p class="lead">
+          Promote the server to a domain controller. Wizard collects forest and
+          domain names, paths for AD database and SYSVOL, and recovery password.
+        </p>
+
+        <div class="step">
+          <h3>Install role</h3>
+          <p>
+            Server Manager → Add Roles and Features → Role-based installation →
+            select this server → check <strong>Active Directory Domain
+            Services</strong>. Add required features when prompted.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777665426/2_nxn0mf.png"
+              alt="Add Roles wizard with AD DS selected"
+              loading="lazy"
+            />
+            <figcaption>AD DS role selected for installation.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Domain name and paths</h3>
+          <p>
+            After install, use <strong>Promote this server to a domain
+            controller</strong>. Choose <strong>Add a new forest</strong> and
+            enter your DNS root name (example in lab: <code>wei.js.com.co</code>).
+            Set NetBIOS name, folder locations, and DSRM password. Review
+            prerequisites; DNS delegation warnings are common in isolated labs.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777665545/3_vmczvi.png"
+              alt="Deployment Configuration new forest and root domain name"
+              loading="lazy"
+            />
+            <figcaption>Define forest and root domain DNS name.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Domain controller options</h3>
+          <p>
+            Select functional levels, confirm <strong>Domain Name System (DNS)
+            server</strong> and <strong>Global Catalog</strong> as required for
+            first DC in forest. Install from media (IFM) only if you use that
+            workflow; otherwise continue with defaults appropriate to your lab.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777665567/5_hlcaar.png"
+              alt="Domain Controller Options DNS and GC"
+              loading="lazy"
+            />
+            <figcaption>DNS + GC on first domain controller.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Wizard pages</h3>
+          <p>
+            Use <strong>Next</strong> through additional options, paths, review,
+            and prerequisite check. When the checklist passes, click
+            <strong>Install</strong>. Promotion runs and the host reboots
+            automatically.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666001/6_avstyx.png"
+              alt="Additional options in domain controller promotion"
+              loading="lazy"
+            />
+          </figure>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666017/7_jwb3ez.png"
+              alt="Paths for AD database logs and SYSVOL"
+              loading="lazy"
+            />
+          </figure>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666032/8_u4dqpc.png"
+              alt="Review selections before AD DS installation"
+              loading="lazy"
+            />
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Prerequisites and reboot</h3>
+          <p>
+            Prerequisite validation should show green checks for a simple lab.
+            After promotion completes, sign in with domain credentials. Server
+            Manager opens on a fresh session.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666047/9_ympbzu.png"
+              alt="Prerequisites check before installing AD DS"
+              loading="lazy"
+            />
+            <figcaption>Installation proceeds; reboot follows automatically.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- Section 3 -->
+      <section class="section" aria-labelledby="s3">
+        <h2 id="s3">3. Additional roles: DHCP and Web Server (IIS)</h2>
+        <p class="lead">
+          Install DHCP for client addressing and IIS for HTTP and later FTP.
+          Add features together in one pass to reduce reboots.
+        </p>
+
+        <div class="step">
+          <h3>Role selection</h3>
+          <p>
+            Add Roles and Features → select <strong>DHCP Server</strong> and
+            <strong>Web Server (IIS)</strong>. Complete dependencies, then finish
+            the wizard.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666064/10_d3luti.png"
+              alt="Server roles DHCP and Web Server IIS selected"
+              loading="lazy"
+            />
+            <figcaption>DHCP and IIS roles marked for install.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>FTP role service</h3>
+          <p>
+            Advance with <strong>Next</strong> until <strong>Role
+            Services</strong> for Web Server. Enable <strong>FTP
+            Server</strong> (FTP service and FTP extensibility as needed for your
+            lab). Complete installation.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666076/11_n9psbz.png"
+              alt="IIS role services with FTP Server checked"
+              loading="lazy"
+            />
+            <figcaption>FTP Server under IIS role services.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- Section 4 DHCP / DNS part of PDF -->
+      <section class="section" aria-labelledby="s4">
+        <h2 id="s4">4. DHCP scope and DNS records</h2>
+        <p class="lead">
+          Authorize DHCP in AD, create a scope for your subnet, set default
+          gateway and DNS options, then add an A record in the forward lookup
+          zone for hosts that should resolve by name.
+        </p>
+
+        <div class="step">
+          <h3>Post-install DHCP</h3>
+          <p>
+            Server Manager shows DHCP post-install configuration. Complete it so
+            the service is authorized in the domain and bound to your server.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666101/12_m8il5s.png"
+              alt="DHCP post-install configuration complete"
+              loading="lazy"
+            />
+            <figcaption>Finish DHCP configuration from Server Manager.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>New scope</h3>
+          <p>
+            <strong>Tools → DHCP</strong> → expand server → IPv4 → right-click
+            <strong>IPv4</strong> → <strong>New Scope</strong>. Wizard asks for
+            name, IP range, exclusions, and lease duration.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666119/13_cqmz1y.png"
+              alt="DHCP console New Scope wizard"
+              loading="lazy"
+            />
+            <figcaption>Create scope for client address pool.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Scope IP range</h3>
+          <p>
+            Define start and end IP consistent with your lab subnet. Exclusions
+            optional for reserved addresses (servers, printers).
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666134/14_tp6vka.png"
+              alt="DHCP scope IP address range"
+              loading="lazy"
+            />
+            <figcaption>Start and end of DHCP range.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Activate scope</h3>
+          <p>
+            When asked whether to activate the scope now, choose
+            <strong>Yes</strong> so clients can obtain leases immediately after
+            you authorize the server if required.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666149/15_ofmzbp.png"
+              alt="Activate DHCP scope dialog Yes"
+              loading="lazy"
+            />
+            <figcaption>Activate scope when prompted.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Default gateway option</h3>
+          <p>
+            In scope options (or during wizard), set <strong>Router
+            (003)</strong> to your lab default gateway so clients get correct
+            outbound routing.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666161/16_aahdcv.png"
+              alt="DHCP scope options default gateway Router 003"
+              loading="lazy"
+            />
+            <figcaption>Default gateway for DHCP clients.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>DNS servers option</h3>
+          <p>
+            Continue with <strong>Next</strong> where applicable. For DNS
+            servers option (<strong>006</strong>), point clients to this DC or
+            your chosen DNS so name resolution works with AD.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666176/17_z15nja.png"
+              alt="DHCP DNS servers scope option"
+              loading="lazy"
+            />
+            <figcaption>DNS option for DHCP clients.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>DNS host (A) record</h3>
+          <p>
+            <strong>Tools → DNS</strong> → <strong>Forward Lookup Zones</strong>
+            → open your domain zone → right-click → <strong>New Host (A or
+            AAAA)</strong>. Enter hostname and IP for services you will test
+            (HTTP, FTP, etc.).
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666192/18_tnsg7v.png"
+              alt="DNS New Host A record in forward lookup zone"
+              loading="lazy"
+            />
+            <figcaption>New A record in the AD DNS zone.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- Section 5 FTP -->
+      <section class="section" aria-labelledby="s5">
+        <h2 id="s5">5. FTP site in IIS</h2>
+        <p class="lead">
+          Publish a folder over FTP: physical path with content, new FTP site in
+          IIS Manager, binding and SSL policy, then authentication and
+          authorization rules matching your lab policy.
+        </p>
+
+        <div class="step">
+          <h3>Content folder</h3>
+          <p>
+            Create a directory on disk (example: under <code>C:\inetpub</code>)
+            and add a small test file so uploads and downloads are easy to
+            verify.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666207/19_v0th15.png"
+              alt="File Explorer folder and test file for FTP"
+              loading="lazy"
+            />
+            <figcaption>Lab folder and test file for FTP.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Add FTP site</h3>
+          <p>
+            <strong>Tools → Internet Information Services (IIS) Manager</strong>
+            → expand server → <strong>Sites</strong> → right-click →
+            <strong>Add FTP Site</strong>. Name the site and set the physical
+            path to your folder.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666219/20_n0ktm5.png"
+              alt="IIS Add FTP Site binding and physical path"
+              loading="lazy"
+            />
+            <figcaption>FTP site name and content path.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Binding and SSL</h3>
+          <p>
+            Choose IP, port (21), and whether to allow or require SSL. For
+            isolated lab testing, <strong>No SSL</strong> is common; production
+            would use FTPS and certificates.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666234/21_ktk8lp.png"
+              alt="FTP binding and SSL settings"
+              loading="lazy"
+            />
+            <figcaption>Binding and SSL policy for FTP site.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Authentication and authorization</h3>
+          <p>
+            Enable basic or anonymous as your exercise requires. Authorization
+            can allow specified users or groups read/write to the FTP root.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666248/22_mrl7a7.png"
+              alt="FTP authentication and authorization settings"
+              loading="lazy"
+            />
+            <figcaption>Authentication and authorization for FTP access.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- Section 6 SMTP -->
+      <section class="section" aria-labelledby="s6">
+        <h2 id="s6">6. SMTP</h2>
+        <p class="lead">
+          Legacy SMTP in Windows uses IIS 6.0 Manager. Create a mailbox user in
+          AD, install SMTP feature, tune authentication and relay so the server
+          can accept or forward mail in the lab.
+        </p>
+
+        <div class="step">
+          <h3>Domain user for mail</h3>
+          <p>
+            <strong>Tools → Active Directory Users and Computers</strong> →
+            <strong>Users</strong> → right-click → <strong>New → User</strong>.
+            Complete logon name and password options. This account can be used
+            when clients authenticate to SMTP if configured.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666266/23_btgb6f.png"
+              alt="Active Directory New Object User wizard"
+              loading="lazy"
+            />
+            <figcaption>New user in AD for SMTP testing.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>User properties</h3>
+          <p>
+            Finish the wizard with password policy appropriate to your course.
+            Optionally set email fields on the user object if your lab tracks
+            them there.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666281/24_vh2uvh.png"
+              alt="New Object User password options"
+              loading="lazy"
+            />
+          </figure>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666294/25_rm7vpw.png"
+              alt="New user created in Active Directory Users and Computers"
+              loading="lazy"
+            />
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Install SMTP Server feature</h3>
+          <p>
+            <strong>Add Roles and Features</strong> → <strong>Features</strong>
+            → enable <strong>SMTP Server</strong>. Confirm management tools if
+            offered. Restart if the installer requests it.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666312/26_ld2pzi.png"
+              alt="Features list before selecting SMTP Server"
+              loading="lazy"
+            />
+          </figure>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666333/27_ymer3d.png"
+              alt="SMTP Server feature checked for installation"
+              loading="lazy"
+            />
+            <figcaption>SMTP Server under Features.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>IIS 6.0 Manager — authentication</h3>
+          <p>
+            <strong>Tools → Internet Information Services (IIS) 6.0
+            Manager</strong> → expand server → SMTP virtual server →
+            <strong>Properties</strong> → <strong>Access</strong> →
+            <strong>Authentication</strong>. Configure anonymous or integrated
+            authentication per lab requirements.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666346/28_dcael2.png"
+              alt="IIS 6 SMTP Authentication dialog"
+              loading="lazy"
+            />
+            <figcaption>SMTP authentication settings.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Relay restrictions</h3>
+          <p>
+            Still under Access / Relay: <strong>Relay</strong> →
+            <strong>Add</strong> → specify IP range or single host allowed to
+            relay through this server. Tight relay lists avoid open relay in real
+            networks; lab may allow the server’s own subnet.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666361/29_bzvuzx.png"
+              alt="SMTP relay restrictions configuration"
+              loading="lazy"
+            />
+          </figure>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666378/30_znk72r.png"
+              alt="SMTP relay add IP address allowed to relay"
+              loading="lazy"
+            />
+            <figcaption>Relay list so designated hosts can route mail.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <!-- Section 7 HTTP -->
+      <section class="section" aria-labelledby="s7">
+        <h2 id="s7">7. HTTP server (default site)</h2>
+        <p class="lead">
+          Replace default IIS web content with your own <code>index.html</code>,
+          then confirm in a browser using the hostname or IP you published in DNS.
+        </p>
+
+        <div class="step">
+          <h3>Remove default content</h3>
+          <p>
+            In the default web site’s physical path (often
+            <code>C:\inetpub\wwwroot</code>), delete or move stock IIS welcome
+            files so only your page is served.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666391/31_ut78km.png"
+              alt="wwwroot folder after removing default IIS files"
+              loading="lazy"
+            />
+            <figcaption>Cleared web root before adding custom page.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Default document</h3>
+          <p>
+            Add <code>index.html</code> (or ensure <strong>Default
+            Document</strong> feature lists <code>index.html</code> first). File
+            should contain minimal HTML to prove the site is yours.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666407/32_wfxhuo.png"
+              alt="index.html in wwwroot for default web site"
+              loading="lazy"
+            />
+            <figcaption>Custom index.html as default document.</figcaption>
+          </figure>
+        </div>
+
+        <div class="step">
+          <h3>Browser test</h3>
+          <p>
+            From a client or the server, open a browser and navigate to the URL
+            you configured earlier (FQDN from DNS or IP). You should see your
+            page without certificate warnings for plain HTTP.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1777666424/33_q9fh19.png"
+              alt="Browser showing served index page from IIS"
+              loading="lazy"
+            />
+            <figcaption>HTTP test in browser.</figcaption>
+          </figure>
+        </div>
+      </section>
+
+      <section class="placeholder-section" id="linux-server" aria-labelledby="linux-heading">
+        <h2 id="linux-heading">Linux server</h2>
+        <p>Workshop content will be added here in a future update.</p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>wei-networks — lab documentation</p>
+    </footer>
+  </body>
+</html>
