@@ -215,6 +215,26 @@ main {
   color: var(--text-dim);
 }
 
+.mermaid-figure .mermaid-wrap {
+  margin-top: 0;
+  padding: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.mermaid-figure .mermaid-wrap .mermaid {
+  display: flex;
+  justify-content: center;
+}
+
+.mermaid-figure .mermaid-wrap svg {
+  max-width: 100%;
+  height: auto;
+}
+
 .placeholder-section {
   padding: 2.5rem 1.5rem;
   text-align: center;

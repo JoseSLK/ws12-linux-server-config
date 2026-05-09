@@ -33,6 +33,62 @@
         </p>
       </header>
 
+      <section class="section" aria-labelledby="topology-heading">
+        <h2 id="topology-heading">Lab topology</h2>
+        <p class="lead">
+          Host-only VirtualBox network: Arch client via <code>vboxnet0</code>,
+          Windows VM as DC and services on <code>192.168.13.0/24</code>.
+        </p>
+        <figure class="figure mermaid-figure">
+          <div class="mermaid-wrap" role="img" aria-label="Lab network diagram">
+            <div class="mermaid">
+graph TD
+    %% Define Styles
+    classDef hardware fill:#2d3436,stroke:#636e72,stroke-width:2px,color:#fff;
+    classDef network fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff;
+    classDef server fill:#d63031,stroke:#ff7675,stroke-width:2px,color:#fff;
+    classDef service fill:#fdcb6e,stroke:#ffeaa7,stroke-width:1px,color:#2d3436;
+
+    %% Physical Machine
+    subgraph Host["Physical Host (Arch Linux)"]
+        Client[Firefox Browser]
+        VBoxNet["vboxnet0 Interface<br/>IP: 192.168.13.2"]
+    end
+    class Host hardware
+
+    %% Virtual Network
+    subgraph Network["VirtualBox Host-Only Network"]
+        Switch["vSwitch<br/>192.168.13.0/24"]
+    end
+    class Network network
+
+    %% Windows Server VM
+    subgraph VM["Windows Server 2012 R2 VM"]
+        Adapter["Ethernet Adapter<br/>Static IP: 192.168.13.1<br/>DNS: 127.0.0.1"]
+
+        subgraph Domain["Active Directory: wei.js.com.co"]
+            AD["AD DS<br/>Domain Controller"]
+            DNS["DNS Server<br/>Port 53<br/>A Record: www → .13.1"]
+            DHCP["DHCP Server<br/>Scope: 192.168.13.100 - .254<br/>Router: .13.1"]
+            IIS["IIS Web Server<br/>Port 80<br/>C:/inetpub/wwwroot"]
+            FTP["FTP Server<br/>Port 21<br/>Basic Auth / Read"]
+            SMTP["SMTP Relay<br/>Port 25<br/>IIS 6.0 Manager"]
+        end
+    end
+    class VM server
+    class AD,DNS,DHCP,IIS,FTP,SMTP service
+
+    %% Connections
+    Client -->|"HTTP/FTP Requests"| VBoxNet
+    VBoxNet <-->|Bridged Connection| Switch
+    Switch <-->|Virtual Cable| Adapter
+    Adapter --- Domain
+            </div>
+          </div>
+          <figcaption>Physical host, host-only switch, and VM roles.</figcaption>
+        </figure>
+      </section>
+
       <!-- Section 1 -->
       <section class="section" aria-labelledby="s1">
         <h2 id="s1">1. Configure a static IP</h2>
@@ -607,5 +663,15 @@
     <footer class="site-footer">
       <p>wei-networks — lab documentation</p>
     </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+      mermaid.initialize({
+        startOnLoad: true,
+        theme: "dark",
+        flowchart: { htmlLabels: true, curve: "basis" },
+        securityLevel: "loose",
+      });
+    </script>
   </body>
 </html>
