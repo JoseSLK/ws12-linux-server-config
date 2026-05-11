@@ -592,6 +592,29 @@ graph TD
             <figcaption>Relay list so designated hosts can route mail.</figcaption>
           </figure>
         </div>
+
+        <div class="step">
+          <h3>Test SMTP delivery</h3>
+          <p>
+            Run <code>Send-MailMessage -From "jose@wei.js.com.co" -To "vero@wei.js.com.co" -Subject "Solicitud Registro" -Body "Mensaje de prueba enviado por SMTP" -SmtpServer "192.168.13.1"</code> in PowerShell. Remember that the address must be configured in the SMTP server. The email file is placed in the <code>Drop</code> folder upon success, otherwise it would be located in another directory.
+          </p>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1778472426/34_zvqy4s.png"
+              alt="PowerShell executing Send-MailMessage"
+              loading="lazy"
+            />
+            <figcaption>PowerShell executing Send-MailMessage.</figcaption>
+          </figure>
+          <figure class="figure">
+            <img
+              src="https://res.cloudinary.com/dbuat2srn/image/upload/v1778472426/35_ngloae.png"
+              alt="File Explorer showing the Drop folder with the email log open in Notepad"
+              loading="lazy"
+            />
+            <figcaption>Mail log in the Drop folder viewed in Notepad.</figcaption>
+          </figure>
+        </div>
       </section>
 
       <!-- Section 7 HTTP -->
@@ -657,6 +680,19 @@ graph TD
       <section class="placeholder-section" id="linux-server" aria-labelledby="linux-heading">
         <h2 id="linux-heading">Linux server</h2>
         <p>Workshop content will be added here in a future update.</p>
+      </section>
+
+      <section class="section" aria-labelledby="author-heading">
+        <h2 id="author-heading">Author</h2>
+        <div class="author-card">
+          <img src="https://res.cloudinary.com/dbuat2srn/image/upload/v1778472427/20260509_071356_001-EDIT_dnq5gy.jpg" alt="Jose Salamanca" class="author-photo" loading="lazy" />
+          <div class="author-details">
+            <p><strong>Jose Salamanca</strong></p>
+            <p>Email: <a href="mailto:jose.salamanca05@uptc.edu.co">jose.salamanca05@uptc.edu.co</a></p>
+            <p>Instagram: <a href="https://instagram.com/Lujoxv" target="_blank" rel="noopener noreferrer">@Lujoxv</a></p>
+            <p>GitHub: <a href="https://github.com/JoseSLK" target="_blank" rel="noopener noreferrer">JoseSLK</a></p>
+          </div>
+        </div>
       </section>
     </main>
 
