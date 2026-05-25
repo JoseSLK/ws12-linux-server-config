@@ -18,7 +18,7 @@
         <h1 class="site-title">wei-networks</h1>
         <nav class="nav" aria-label="Workshops">
           <a href="#ws12">WS 12</a>
-          <span class="nav__disabled" title="Not available yet">Linux server</span>
+          <a href="#linux-server">Linux server</a>
         </nav>
       </div>
     </header>
@@ -677,10 +677,778 @@ graph TD
         </div>
       </section>
 
-      <section class="placeholder-section" id="linux-server" aria-labelledby="linux-heading">
-        <h2 id="linux-heading">Linux server</h2>
-        <p>Workshop content will be added here in a future update.</p>
-      </section>
+      <div id="linux-server" class="workshop-section">
+        <header class="hero">
+          <h1>Linux Server Workshop — Rocky Linux 10.1</h1>
+          <p>
+            Step-by-step setup on Rocky Linux (Red Hat based): static addressing with NetworkManager, 
+            BIND DNS server, Kea DHCP server, vsftpd FTP server, Postfix and Dovecot email server, 
+            and a simple website with Apache httpd.
+          </p>
+        </header>
+
+        <section class="section" aria-labelledby="linux-topology-heading">
+          <h2 id="linux-topology-heading">Lab topology</h2>
+          <p class="lead">
+            Isolated VirtualBox network (Host-only): Arch Linux client via <code>vboxnet0</code>, 
+            Rocky Linux VM server on the <code>192.168.13.0/24</code> subnet.
+          </p>
+          <figure class="figure mermaid-figure">
+            <div class="mermaid-wrap" role="img" aria-label="Linux lab network diagram">
+              <div class="mermaid">
+graph TD
+    %% Define Styles
+    classDef hardware fill:#2d3436,stroke:#636e72,stroke-width:2px,color:#fff;
+    classDef network fill:#0984e3,stroke:#74b9ff,stroke-width:2px,color:#fff;
+    classDef server fill:#d63031,stroke:#ff7675,stroke-width:2px,color:#fff;
+    classDef service fill:#fdcb6e,stroke:#ffeaa7,stroke-width:1px,color:#2d3436;
+
+    %% Physical Machine
+    subgraph Host["Physical Host (Arch Linux)"]
+        Client[Firefox / Client FTP / Thunderbird]
+        VBoxNet["vboxnet0 Interface<br/>IP: 192.168.13.2"]
+    end
+    class Host hardware
+
+    %% Virtual Network
+    subgraph Network["VirtualBox Host-Only Network"]
+        Switch["vSwitch<br/>192.168.13.0/24"]
+    end
+    class Network network
+
+    %% Rocky Linux VM
+    subgraph VM["Rocky Linux 10.1 VM<br/>(servidor.wei.js.com.co)"]
+        Adapter["Ethernet Adapter (enp0s3)<br/>Static IP: 192.168.13.1<br/>DNS: 192.168.13.1"]
+
+        subgraph Services["Services: wei.js.com.co"]
+            BIND["BIND DNS Server<br/>Port 53<br/>Zones: Forward & Reverse"]
+            Kea["Kea DHCP Server<br/>Scope: 192.168.13.100 - .254"]
+            Apache["Apache HTTP Server<br/>Port 80<br/>/var/www/html"]
+            vsftpd["vsftpd FTP Server<br/>Port 21<br/>Local Auth & User List"]
+            Mail["Mail Server (Postfix + Dovecot)<br/>SMTP: Port 25 / IMAP: Port 143"]
+        end
+    end
+    class VM server
+    class BIND,Kea,Apache,vsftpd,Mail service
+
+    %% Connections
+    Client -->|"HTTP / FTP / SMTP / IMAP Requests"| VBoxNet
+    VBoxNet <-->|Bridged Connection| Switch
+    Switch <-->|Virtual Cable| Adapter
+    Adapter --- Services
+              </div>
+            </div>
+            <figcaption>Physical host, VirtualBox Host-only switch, and services configured on Rocky Linux.</figcaption>
+          </figure>
+        </section>
+
+        <!-- Section 1 -->
+        <section class="section" aria-labelledby="l1">
+          <h2 id="l1">1. Static IP address and NetworkManager</h2>
+          <p class="lead">
+            Network servers require static addressing to ensure clients and DNS services always resolve to the same IP. Configure the network interface using <code>nmcli</code> before installing system daemons.
+          </p>
+
+          <div class="step">
+            <h3>Rocky Linux 10.1 (Red Hat Base)</h3>
+            <p>
+              Initialization of the Rocky Linux 10.1 operating system, an enterprise distribution based on Red Hat Enterprise Linux (RHEL) source code, ensuring stability for network services.
+            </p>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725551/1_l4kkoa.png"
+                alt="Rocky Linux welcome screen"
+                loading="lazy"
+              />
+              <figcaption>Rocky Linux 10.1 operating system boot.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Initial network state (DHCP)</h3>
+            <p>
+              By default, the <code>enp0s3</code> interface receives a dynamic IP address (e.g. <code>10.0.2.15</code>) assigned by the VirtualBox NAT service, which is not suitable for an infrastructure server.
+            </p>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725599/2_dy42dc.png"
+                alt="enp0s3 interface details via DHCP"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725591/3_hxvw2l.png"
+                alt="Initial network diagnostics with ip addr and routes"
+                loading="lazy"
+              />
+              <figcaption>Initial addressing via VirtualBox NAT DHCP.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Manual static IP assignment</h3>
+            <p>
+              Modify the connection using NetworkManager via the <code>nmcli</code> console tool. Set the method to manual, assign the static IP address <code>192.168.13.1/24</code>, define the gateway as <code>192.168.13.254</code>, and add the DNS servers.
+            </p>
+            <pre><code># Configure manual addressing
+sudo nmcli con mod "enp0s3" ipv4.method manual \
+  ipv4.addresses 192.168.13.1/24 \
+  ipv4.gateway 192.168.13.254 \
+  ipv4.dns "192.168.13.1,8.8.8.8"
+
+# Apply changes to the adapter
+sudo nmcli con up "enp0s3"</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725587/4_olult8.png"
+                alt="Execution of nmcli in the terminal"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725579/5_laxz0b.png"
+                alt="Bringing up the modified connection"
+                loading="lazy"
+              />
+              <figcaption>Application of static addressing using nmcli.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Adapter adjustment in the virtual machine</h3>
+            <p>
+              If a lack of connectivity or adapter not found error occurs, verify the virtual machine's network configuration in VirtualBox, ensuring the interface is in "Host-only" network mode linked to the correct adapter (e.g. <code>vboxnet0</code>).
+            </p>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725579/6_iy3acf.png"
+                alt="Connectivity error in terminal"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725572/7_spiaxl.png"
+                alt="Successful connection after VirtualBox reconfiguration"
+                loading="lazy"
+              />
+              <figcaption>Activation and verification of connectivity in the Host-only segment.</figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <!-- Section 2 -->
+        <section class="section" aria-labelledby="l2">
+          <h2 id="l2">2. Package installation and security policies</h2>
+          <p class="lead">
+            Install the network tools and servers for the lab. Then, open the ports in the system firewall and set SELinux to permissive mode to enable network interoperability.
+          </p>
+
+          <div class="step">
+            <h3>System services and network utilities</h3>
+            <p>
+              Install the required services (BIND DNS, vsftpd FTP, Postfix SMTP, Apache HTTP) along with text editors and diagnostic commands using the <code>dnf</code> package manager.
+            </p>
+            <pre><code>sudo dnf install -y bind bind-utils vsftpd postfix httpd telnet net-tools nano vim mailx</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725567/8_kybko6.png"
+                alt="Installation of essential packages with dnf"
+                loading="lazy"
+              />
+              <figcaption>Installation of BIND, vsftpd, Postfix, and Apache on Rocky Linux.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Modern DHCP server (Kea DHCP)</h3>
+            <p>
+              In modern RHEL-based distributions (like Rocky Linux 9 and 10), the classic ISC DHCP server has been replaced by <strong>Kea DHCP</strong>. Install the DHCP engine and its necessary dependencies.
+            </p>
+            <pre><code>sudo dnf install -y kea kea-libs</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725561/9_ddlj3m.png"
+                alt="Kea DHCP installation on Rocky Linux"
+                loading="lazy"
+              />
+            </figure>
+            <p>
+              Enable and start the DHCP4 daemon to ensure it loads at system boot.
+            </p>
+            <pre><code>sudo systemctl enable --now kea-dhcp4</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725553/10_ubpbno.png"
+                alt="kea-dhcp4 service enabled and active"
+                loading="lazy"
+              />
+              <figcaption>Enabling and initial startup of the Kea DHCP server.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Firewall and SELinux policies</h3>
+            <p>
+              Permanently allow incoming traffic for all lab services (DNS, DHCP, FTP, SMTP, HTTP) in the firewall. Apply changes by reloading <code>firewalld</code>. Finally, change SELinux temporarily and permanently to permissive mode to avoid socket and shared folder blocks.
+            </p>
+            <pre><code># Permanently enable services in the firewall
+sudo firewall-cmd --permanent --add-service=dns
+sudo firewall-cmd --permanent --add-service=dhcp
+sudo firewall-cmd --permanent --add-service=ftp
+sudo firewall-cmd --permanent --add-service=smtp
+sudo firewall-cmd --permanent --add-service=http
+sudo firewall-cmd --reload
+
+# Change SELinux to permissive (avoid service blocks in non-standard folders)
+sudo setenforce 0
+sudo sed -i 's/^SELINUX=enforcing/SELINUX=permissive/' /etc/selinux/config</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725551/11_ufqduv.png"
+                alt="Firewall and SELinux configuration in terminal"
+                loading="lazy"
+              />
+            </figure>
+            <p>
+              Once the security parameters are configured, permanently enable and start the rest of the main services:
+            </p>
+            <pre><code>sudo systemctl enable --now named vsftpd postfix httpd</code></pre>
+            <figcaption>Opening ports in firewalld and relaxing SELinux.</figcaption>
+          </div>
+        </section>
+
+        <!-- Section 3 -->
+        <section class="section" aria-labelledby="l3">
+          <h2 id="l3">3. Hostname and DNS server (BIND)</h2>
+          <p class="lead">
+            Define the fully qualified domain name (FQDN) of the server and configure BIND to act as the authoritative name server for the local domain, managing both forward and reverse resolution.
+          </p>
+
+          <div class="step">
+            <h3>System Hostname definition</h3>
+            <p>
+              Set the hostname to <code>wei.js.com.co</code> using the <code>hostnamectl</code> system tool.
+            </p>
+            <pre><code>sudo hostnamectl set-hostname wei.js.com.co</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725592/12_ayacoo.png"
+                alt="Definition of hostname wei.js.com.co"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725587/13_wbntql.png"
+                alt="Verification of the /etc/hostname file"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725580/14_vpr3m8.png"
+                alt="Detailed display of hostname variables"
+                loading="lazy"
+              />
+            </figure>
+            <p>
+              Confirm system changes by running hostname diagnostics.
+            </p>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725575/15_dqpk6w.png"
+                alt="Correct hostname check in terminal"
+                loading="lazy"
+              />
+              <figcaption>Assignment and check of FQDN wei.js.com.co on Rocky Linux.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>General BIND configuration (named.conf)</h3>
+            <p>
+              Edit the main BIND directives file at <code>/etc/named.conf</code>. Change the <code>listen-on port 53</code> lines to listen on any server network interface (or add <code>192.168.13.1</code>) and modify <code>allow-query</code> to allow queries from any host or the local <code>192.168.13.0/24</code> segment.
+            </p>
+            <pre><code>sudo nano /etc/named.conf</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725573/16_fw6pag.png"
+                alt="Editing the named.conf file in terminal"
+                loading="lazy"
+              />
+              <figcaption>Adjustment of listening interfaces and query permissions in named.conf.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Forward Zone creation</h3>
+            <p>
+              Declare the forward zone for the <code>wei.js.com.co</code> domain inside the <code>/var/named/</code> directory. Modify the file by adding the necessary resource records: the authoritative SOA record, the NS record pointing to the local server, and A records to map service URLs (<code>servidor</code>, <code>www</code>, <code>ftp</code>, <code>mail</code>) to the server's IP address.
+            </p>
+            <pre><code>sudo nano /var/named/wei.js.com.co.zone</code></pre>
+            <pre><code>$TTL 86400
+@   IN  SOA servidor.wei.js.com.co. admin.wei.js.com.co. (
+        2024052401  ; Serial
+        3600        ; Refresh
+        1800        ; Retry
+        604800      ; Expire
+        86400 )     ; Minimum TTL
+
+@        IN  NS  servidor.wei.js.com.co.
+@        IN  A   192.168.13.1
+servidor IN  A   192.168.13.1
+www      IN  A   192.168.13.1
+ftp      IN  A   192.168.13.1
+mail     IN  A   192.168.13.1</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725567/17_ztvkzy.png"
+                alt="Forward zone file wei.js.com.co.zone"
+                loading="lazy"
+              />
+              <figcaption>A record structure for the local domain.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Reverse Zone creation</h3>
+            <p>
+              Declare the reverse resolution zone to allow resolving names from IP addresses in the <code>192.168.13.0/24</code> subnet. Create the corresponding zone file using PTR records to map the last octet of the addressing to the previously defined hostnames.
+            </p>
+            <pre><code>sudo nano /var/named/13.168.192.rev</code></pre>
+            <pre><code>$TTL 86400
+@   IN  SOA servidor.wei.js.com.co. admin.wei.js.com.co. (
+        2024052401  ; Serial
+        3600        ; Refresh
+        1800        ; Retry
+        604800      ; Expire
+        86400 )     ; Minimum TTL
+
+@   IN  NS  servidor.wei.js.com.co.
+1   IN  PTR servidor.wei.js.com.co.
+1   IN  PTR www.wei.js.com.co.
+1   IN  PTR ftp.wei.js.com.co.
+1   IN  PTR mail.wei.js.com.co.</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725567/18_gld6b2.png"
+                alt="Reverse zone file 13.168.192.rev"
+                loading="lazy"
+              />
+              <figcaption>PTR record structure for reverse resolution.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Structural validation and daemon restart</h3>
+            <p>
+              Verify that the zone syntax is correct using the BIND validation commands and restart the <code>named</code> service if the check is successful.
+            </p>
+            <pre><code># Validate zone files
+sudo named-checkzone wei.js.com.co /var/named/wei.js.com.co.zone
+sudo named-checkzone 13.168.192.in-addr.arpa /var/named/13.168.192.rev
+
+# Restart and verify DNS service state
+sudo systemctl restart named
+sudo systemctl status named</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725561/19_b2xdjc.png"
+                alt="Successful named restart without errors"
+                loading="lazy"
+              />
+              <figcaption>Final check and successful restart of BIND DNS.</figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <!-- Section 4 -->
+        <section class="section" aria-labelledby="l4">
+          <h2 id="l4">4. DHCP Server (Kea)</h2>
+          <p class="lead">
+            Configure the Kea DHCP engine to dynamically assign IP addresses within the lab subnet, delivering local gateway and DNS routes to client hosts.
+          </p>
+
+          <div class="step">
+            <h3>Kea service configuration (kea-dhcp4.conf)</h3>
+            <p>
+              Edit the configuration file at <code>/etc/kea/kea-dhcp4.conf</code> in JSON format. Assign the <code>enp0s3</code> network interface to listen for DHCP requests, define the lease database in memory, set the lease cycle, and declare the <code>192.168.13.0/24</code> subnet along with the IP pool (<code>192.168.13.100 - 192.168.13.254</code>) and global options (gateway, DNS servers, and domain name).
+            </p>
+            <pre><code>sudo nano /etc/kea/kea-dhcp4.conf</code></pre>
+            <pre><code class="language-json">{
+"Dhcp4": {
+    "interfaces-config": {
+        "interfaces": [ "enp0s3" ]
+    },
+    "lease-database": {
+        "type": "memfile",
+        "persist": true,
+        "name": "/var/lib/kea/kea-leases4.csv"
+    },
+    "valid-lifetime": 4000,
+    "renew-timer": 1000,
+    "rebind-timer": 2000,
+    "subnet4": [
+        {
+            "subnet": "192.168.13.0/24",
+            "pools": [
+                {
+                    "pool": "192.168.13.100 - 192.168.13.254"
+                }
+            ],
+            "option-data": [
+                {
+                    "name": "routers",
+                    "data": "192.168.13.1"
+                },
+                {
+                    "name": "domain-name-servers",
+                    "data": "192.168.13.1"
+                },
+                {
+                    "name": "domain-name",
+                    "data": "wei.js.com.co"
+                }
+            ]
+        }
+    ]
+}
+}</code></pre>
+          </div>
+
+          <div class="step">
+            <h3>Persistence directory and service startup</h3>
+            <p>
+              Ensure the directory where active DHCP leases will be saved exists and has the Kea service owners. Afterward, restart the service and verify it's running without failures.
+            </p>
+            <pre><code># Ensure lease database permissions
+sudo mkdir -p /var/lib/kea
+sudo chown kea:kea /var/lib/kea
+
+# Start DHCP4 server
+sudo systemctl restart kea-dhcp4
+sudo systemctl status kea-dhcp4</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725552/20_qqw6z4.png"
+                alt="Restart of kea-dhcp4"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725551/21_zuvrsp.png"
+                alt="Kea DHCP4 service active state"
+                loading="lazy"
+              />
+              <figcaption>Kea DHCP server successfully started and listening for requests on enp0s3.</figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <!-- Section 5 -->
+        <section class="section" aria-labelledby="l5">
+          <h2 id="l5">5. FTP Server (vsftpd)</h2>
+          <p class="lead">
+            Configure the vsftpd service to enable secure file exchange via local server system users, restricting login to allowed accounts.
+          </p>
+
+          <div class="step">
+            <h3>Local user restriction (vsftpd.conf)</h3>
+            <p>
+              Open the service configuration file at <code>/etc/vsftpd/vsftpd.conf</code>. At the end of the file, enable user list checking and define that vsftpd should deny login to any user not explicitly in the <code>user_list</code> file.
+            </p>
+            <pre><code>sudo nano /etc/vsftpd/vsftpd.conf</code></pre>
+            <pre><code># Add at the end of the file to restrict access
+userlist_enable=YES
+userlist_file=/etc/vsftpd/user_list
+userlist_deny=NO</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725591/22_gu1jlz.png"
+                alt="user_list configuration at the end of vsftpd.conf"
+                loading="lazy"
+              />
+              <figcaption>Directives to use local user whitelists for FTP.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>FTP user creation and access policies</h3>
+            <p>
+              Create a local user with an active home folder and enter their access password. Then, append their qualified username to the <code>/etc/vsftpd/user_list</code> access control file to grant them login permissions.
+            </p>
+            <pre><code># Create system user and enter password
+sudo useradd -m ftpuser
+sudo passwd ftpuser
+
+# Enable user by adding them to the whitelist
+echo "ftpuser" | sudo tee -a /etc/vsftpd/user_list
+
+# Restart vsftpd to apply changes
+sudo systemctl restart vsftpd</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725587/23_eejhjn.png"
+                alt="Creation of local user in terminal"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725580/24_rhjtfb.png"
+                alt="Password entry for the user"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725573/25_tkeq7k.png"
+                alt="Insertion of user to vsftpd user_list"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725573/26_yvkqr7.png"
+                alt="Restart of vsftpd"
+                loading="lazy"
+              />
+              <figcaption>Adding the user to the authorized FTP list and restarting the service.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Connectivity check and file exchange</h3>
+            <p>
+              From the host machine (Arch Linux) using the KDE Dolphin file manager, connect to the <code>ftp://ftpuser@192.168.13.1</code> path. Enter the declared credentials to view and move files within the server's personal folder without policy restrictions.
+            </p>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725567/27_blxasn.png"
+                alt="FTP server access from Dolphin on Arch"
+                loading="lazy"
+              />
+            </figure>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725562/28_kpkpju.png"
+                alt="Uploading and viewing personal files"
+                loading="lazy"
+              />
+              <figcaption>Successful connection and bidirectional transfer from Dolphin on the host machine.</figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <!-- Section 6 -->
+        <section class="section" aria-labelledby="l6">
+          <h2 id="l6">6. Mail Server (Postfix + Dovecot)</h2>
+          <p class="lead">
+            Configure a complete local email flow. Integrate the Postfix daemon for outbound transfer (SMTP) with Dovecot for inbound reading (IMAP), facilitating access from clients like Mozilla Thunderbird.
+          </p>
+
+          <div class="step">
+            <h3>Dovecot installation</h3>
+            <p>
+              Install the Dovecot package to provide the IMAP mail reception gateway on the server.
+            </p>
+            <pre><code>sudo dnf install -y dovecot</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725561/29_bmxdbi.png"
+                alt="Installation of the dovecot package"
+                loading="lazy"
+              />
+              <figcaption>Installation of the Dovecot inbound mail daemon.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>SMTP Server Configuration (Postfix)</h3>
+            <p>
+              Edit the main Postfix directives file at <code>/etc/postfix/main.cf</code>. Configure the parameters to assign the FQDN to the server, define the primary mail domain, authorize listening on all system interfaces, and enable storage in <strong>Maildir</strong> format within each user's home directory.
+            </p>
+            <pre><code>sudo nano /etc/postfix/main.cf</code></pre>
+            <pre><code># Edit or add the following parameters
+myhostname = servidor.wei.js.com.co
+mydomain = wei.js.com.co
+myorigin = $mydomain
+inet_interfaces = all
+mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain
+home_mailbox = Maildir/</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725551/30_gal3ab.png"
+                alt="SMTP directives in the main.cf file"
+                loading="lazy"
+              />
+              <figcaption>Addressing, interfaces, and Maildir configuration in Postfix.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>IMAP Server Configuration (Dovecot)</h3>
+            <p>
+              Edit the Dovecot configuration to match the received mail location with the Maildir setup declared in Postfix. Open <code>/etc/dovecot/conf.d/10-mail.conf</code> and set the path.
+            </p>
+            <pre><code>sudo nano /etc/dovecot/conf.d/10-mail.conf</code></pre>
+            <pre><code># Change the default mailbox path
+mail_location = maildir:~/Maildir</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725551/31_k2nx2n.png"
+                alt="Editing the 10-mail.conf file"
+                loading="lazy"
+              />
+            </figure>
+            <p>
+              Next, edit the authentication directives in <code>/etc/dovecot/conf.d/10-auth.conf</code> to allow plaintext logins (necessary in local lab networks without SSL) and enable standard login mechanisms.
+            </p>
+            <pre><code>sudo nano /etc/dovecot/conf.d/10-auth.conf</code></pre>
+            <pre><code># Allow basic authentication without SSL
+disable_plaintext_auth = no
+auth_mechanisms = plain login</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725599/32_isavn7.png"
+                alt="Authentication policies in 10-auth.conf"
+                loading="lazy"
+              />
+            </figure>
+            <p>
+              Finally, modify <code>/etc/dovecot/conf.d/10-master.conf</code> to define network listening ports, ensuring the standard IMAP port 143.
+            </p>
+            <pre><code>sudo nano /etc/dovecot/conf.d/10-master.conf</code></pre>
+            <pre><code># In the service imap-login { ... } section
+inet_listener imap {
+  port = 143
+}</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725599/33_ahocdb.png"
+                alt="Configuration of the imap listener in 10-master.conf"
+                loading="lazy"
+              />
+              <figcaption>Configuration of location, authentication methods, and listeners in Dovecot.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Mailbox and email account creation</h3>
+            <p>
+              Create the local users for email (e.g. <code>jose</code> and <code>vero</code>), which will automatically generate their personal storage directories and allow login authentication.
+            </p>
+            <pre><code># Create users and enter passwords
+sudo useradd -m vero
+sudo passwd vero
+
+sudo useradd -m jose
+sudo passwd jose</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725604/34_j7sebr.png"
+                alt="Creation and passwords for vero and jose"
+                loading="lazy"
+              />
+              <figcaption>User accounts configured for sending and receiving emails.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Firewall enablement and startup</h3>
+            <p>
+              Open the ports for email protocols (<code>imap</code>, <code>imaps</code>) in the system firewall, reload the configuration, and start/restart the main Postfix and Dovecot daemons.
+            </p>
+            <pre><code># Enable incoming mail services in the firewall
+sudo firewall-cmd --permanent --add-service=imap
+sudo firewall-cmd --permanent --add-service=imaps
+sudo firewall-cmd --reload
+
+# Restart and enable start on boot
+sudo systemctl restart postfix
+sudo systemctl restart dovecot
+sudo systemctl enable dovecot
+
+# Verify execution states
+sudo systemctl status postfix
+sudo systemctl status dovecot</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725606/35_jyfq16.png"
+                alt="Execution state of the postfix and dovecot services"
+                loading="lazy"
+              />
+              <figcaption>Active local mail server ready to sync mailboxes with clients like Thunderbird.</figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <!-- Section 7 -->
+        <section class="section" aria-labelledby="l7">
+          <h2 id="l7">7. HTTP Server (Apache httpd)</h2>
+          <p class="lead">
+            Deploy a local HTML content portal visible from LAN hosts using the Apache HTTP Server (<code>httpd</code>).
+          </p>
+
+          <div class="step">
+            <h3>Apache web service verification</h3>
+            <p>
+              Verify the state of the Apache daemon to confirm it is loaded in memory and responding on HTTP port 80.
+            </p>
+            <pre><code>sudo systemctl status httpd</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725607/36_lzl6gt.png"
+                alt="Checking the state of httpd"
+                loading="lazy"
+              />
+              <figcaption>Checking the httpd service on the server.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Content directories and custom Index</h3>
+            <p>
+              Create or edit the <code>index.html</code> web file inside the default web server root directory at <code>/var/www/html/</code>, which will contain your site's custom design.
+            </p>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725607/37_kcyk98.png"
+                alt="Viewing the index.html file in the root folder"
+                loading="lazy"
+              />
+              <figcaption>/var/www/html directory ready for portal content loading.</figcaption>
+            </figure>
+          </div>
+
+          <div class="step">
+            <h3>Owner adjustments, permissions, and restart</h3>
+            <p>
+              For Apache to properly read the content, assign the file owner to the <code>apache</code> user and adjust read and execute permissions. Afterward, restart the <code>httpd</code> service to refresh file descriptors.
+            </p>
+            <pre><code># Change owners to apache
+sudo chown -R apache:apache /var/www/html
+
+# Grant global read and execute permissions
+sudo chmod -R 755 /var/www/html
+
+# Restart Apache web server
+sudo systemctl restart httpd</code></pre>
+            <figure class="figure">
+              <img
+                src="https://res.cloudinary.com/dwk9eph3z/image/upload/v1779725608/38_bfgbri.png"
+                alt="Permission configuration and Apache restart"
+                loading="lazy"
+              />
+              <figcaption>Putting the local web server into production with optimized permissions.</figcaption>
+            </figure>
+          </div>
+        </section>
+      </div>
 
       <section class="section" aria-labelledby="author-heading">
         <h2 id="author-heading">Author</h2>

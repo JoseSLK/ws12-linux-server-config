@@ -313,3 +313,15 @@ main {
     align-items: flex-start;
   }
 }
+
+/* Elegant spacing and divider between separate workshops */
+.workshop-section {
+  margin-top: 5rem;
+  padding-top: 4rem;
+  border-top: 1px solid var(--border);
+}
+
+pre {
+  overflow-x: auto;
+  max-width: 100%;
+}
